@@ -1,1 +1,1 @@
-web: gunicorn app:src/worfapi
+web: gunicorn worfapi:app
