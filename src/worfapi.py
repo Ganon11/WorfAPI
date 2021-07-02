@@ -16,6 +16,12 @@ def save_memory(obj):
   with open('data/memory.json', 'w') as fh:
     fh.write(json.dumps(obj))
 
+def create_response(response_type, text):
+  response = dict()
+  response['response_type'] = response_type
+  response['text'] = text
+  return response
+
 class Honor(Resource): # pylint: disable=too-few-public-methods
   '''Determines whether the given input has honor or not.'''
 
@@ -36,22 +42,32 @@ class Honor(Resource): # pylint: disable=too-few-public-methods
 
     return False
 
+  def _format_response(self, text, honorable):
+    if honorable:
+      return create_response('in_channel', f'{text} has honor.')
+
+    return create_response('in_channel', f'{text} is without honor.')
+
   def post(self):
     '''Returns a phrase describing the honor of the input.'''
     parser = reqparse.RequestParser()
     parser.add_argument('text', required=True)
     args = parser.parse_args()
 
-    if self._get_honor(args.text.lower()):
-      return f'{args.text} has honor.', 200
-
-    return f'{args.text} is without honor.', 200
+    is_honorable = self._get_honor(args.text.lower())
+    return self._format_response(args.text, is_honorable), 200
 
 class SetHonor(Resource): # pylint: disable=too-few-public-methods
   '''Overrides the honor value for a given input phrase.'''
 
   def __init__(self):
     self.memory = fetch_memory()
+
+  def _format_response(self, text, honorable):
+    if honorable:
+      return create_response('ephemeral', f'{text} will be remembered as honorable.')
+
+    return create_response('ephemeral', f'{text} will be remembered as dishonorable.')
 
   def post(self):
     '''Adds a phrase to the known list of honorable/dishonorable phrases.'''
@@ -82,10 +98,7 @@ class SetHonor(Resource): # pylint: disable=too-few-public-methods
       return 'Invalid request format: should be "phrase:true" or "phrase:false"', 400
 
     save_memory(self.memory)
-    if is_honorable == 'true':
-      return f'{values[0]} will be remembered as honorable.', 200
-
-    return f'{values[0]} will be remembered as dishonorable.', 200
+    return self._format_response(values[0], is_honorable == 'true'), 200
 
 class RemoveHonor(Resource): # pylint: disable=too-few-public-methods
   '''Removes an overriden value for a given input phrase.'''
@@ -108,7 +121,7 @@ class RemoveHonor(Resource): # pylint: disable=too-few-public-methods
       return f'{args.text} was not found', 404
 
     save_memory(self.memory)
-    return f'{args.text} has been forgotten', 200
+    return create_response('ephemeral', f'{args.text} has been forgotten.'), 200
 
 api.add_resource(Honor, '/honor')
 api.add_resource(SetHonor, '/sethonor')
