@@ -1,21 +1,26 @@
-from flask import Flask
-from flask_restful import Resource, Api, reqparse, inputs
 import hashlib
 import json
+from flask import Flask
+from flask_restful import Resource, Api, reqparse
 
 app = Flask(__name__)
 api = Api(app)
 
-class Honor(Resource):
+def fetch_memory():
+  '''Reads a json file and returns the equivalent object.'''
+  with open('data/memory.json', 'r') as fh:
+    return json.load(fh)
+
+def save_memory(obj):
+  '''Dumps an object as a json string into a file.'''
+  with open('data/memory.json', 'w') as fh:
+    fh.write(json.dumps(obj))
+
+class Honor(Resource): # pylint: disable=too-few-public-methods
   '''Determines whether the given input has honor or not.'''
 
   def __init__(self):
-    with open('data/memory.json', 'r') as fh:
-      self.memory = json.load(fh)
-
-  def _save_honor(self):
-    with open('data/memory.json', 'w') as fh:
-      fh.write(json.dumps(self.memory))
+    self.memory = fetch_memory()
 
   def _get_honor(self, topic):
     '''Returns True if the phrase is honorable, False otherwise.'''
@@ -31,62 +36,83 @@ class Honor(Resource):
 
     return False
 
-  def get(self):
+  def post(self):
     '''Returns a phrase describing the honor of the input.'''
     parser = reqparse.RequestParser()
-    parser.add_argument('phrase', required=True)
+    parser.add_argument('text', required=True)
     args = parser.parse_args()
 
-    if self._get_honor(args.phrase.lower()):
-      return f'{args.phrase} has honor.', 200
+    if self._get_honor(args.text.lower()):
+      return f'{args.text} has honor.', 200
 
-    return f'{args.phrase} is without honor.', 200
+    return f'{args.text} is without honor.', 200
+
+class SetHonor(Resource): # pylint: disable=too-few-public-methods
+  '''Overrides the honor value for a given input phrase.'''
+
+  def __init__(self):
+    self.memory = fetch_memory()
 
   def post(self):
     '''Adds a phrase to the known list of honorable/dishonorable phrases.'''
     parser = reqparse.RequestParser()
-    parser.add_argument('phrase', required=True)
-    parser.add_argument('is_honorable', required=True, type=inputs.boolean)
+    parser.add_argument('text', required=True)
     args = parser.parse_args()
 
-    topic = args.phrase.lower()
+    values = args.text.split(':')
+    if len(values) != 2:
+      return 'Invalid request format: should be "phrase:true" or "phrase:false"', 400
 
-    if args.is_honorable:
+    topic = values[0].lower()
+    is_honorable = values[1].lower()
+
+    if is_honorable == 'true':
       if topic not in self.memory['honor']:
         self.memory['honor'].append(topic)
 
       if topic in self.memory['dishonor']:
         self.memory['dishonor'].remove(topic)
-    else:
-      # Not honorable!
+    elif is_honorable == 'false':
       if topic not in self.memory['dishonor']:
         self.memory['dishonor'].append(topic)
 
       if topic in self.memory['honor']:
         self.memory['honor'].remove(topic)
+    else:
+      return 'Invalid request format: should be "phrase:true" or "phrase:false"', 400
 
-    self._save_honor()
-    if args.is_honorable:
-      return f'{args.phrase} will be remembered as honorable.', 200
+    save_memory(self.memory)
+    if is_honorable == 'true':
+      return f'{values[0]} will be remembered as honorable.', 200
 
-    return f'{args.phrase} will be remembered as dishonorable.', 200
+    return f'{values[0]} will be remembered as dishonorable.', 200
 
-  def delete(self):
+class RemoveHonor(Resource): # pylint: disable=too-few-public-methods
+  '''Removes an overriden value for a given input phrase.'''
+
+  def __init__(self):
+    self.memory = fetch_memory()
+
+  def post(self):
     '''Deletes a phrase from the known list of honorable/dishonorable phrases.'''
     parser = reqparse.RequestParser()
-    parser.add_argument('phrase', required=True)
+    parser.add_argument('text', required=True)
     args = parser.parse_args()
 
-    topic = args.phrase.lower()
+    topic = args.text.lower()
     if topic in self.memory['honor']:
       self.memory['honor'].remove(topic)
-    if topic in self.memory['dishonor']:
+    elif topic in self.memory['dishonor']:
       self.memory['dishonor'].remove(topic)
+    else:
+      return f'{args.text} was not found', 404
 
-    self._save_honor()
-    return f'{args.phrase} has been forgotten', 200
+    save_memory(self.memory)
+    return f'{args.text} has been forgotten', 200
 
 api.add_resource(Honor, '/honor')
+api.add_resource(SetHonor, '/sethonor')
+api.add_resource(RemoveHonor, '/removehonor')
 
 if __name__ == '__main__':
   app.run()
