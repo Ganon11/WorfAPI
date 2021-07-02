@@ -1,0 +1,16 @@
+{
+  "folders":
+  [
+    {
+      "path": "."
+    }
+  ],
+  "settings":
+  {
+    "pylinter":
+    {
+      "python_bin": "venv/Scripts/python",
+      "pylint_path": "venv/Scripts/pylint"
+    }
+  }
+}
