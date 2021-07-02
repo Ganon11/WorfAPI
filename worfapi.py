@@ -77,7 +77,7 @@ class SetHonor(Resource): # pylint: disable=too-few-public-methods
 
     values = args.text.split(':')
     if len(values) != 2:
-      return 'Invalid request format: should be "phrase:true" or "phrase:false"', 200
+      return create_response('ephemeral', 'Invalid request format: should be "phrase:true" or "phrase:false"'), 200
 
     topic = values[0].lower()
     is_honorable = values[1].lower()
@@ -95,7 +95,7 @@ class SetHonor(Resource): # pylint: disable=too-few-public-methods
       if topic in self.memory['honor']:
         self.memory['honor'].remove(topic)
     else:
-      return 'Invalid request format: should be "phrase:true" or "phrase:false"', 200
+      return create_response('ephemeral', 'Invalid request format: should be "phrase:true" or "phrase:false"'), 200
 
     save_memory(self.memory)
     return self._format_response(values[0], is_honorable == 'true'), 200
@@ -118,7 +118,7 @@ class RemoveHonor(Resource): # pylint: disable=too-few-public-methods
     elif topic in self.memory['dishonor']:
       self.memory['dishonor'].remove(topic)
     else:
-      return f'{args.text} was not found', 200
+      return create_response('ephemeral', f'{args.text} was not found'), 200
 
     save_memory(self.memory)
     return create_response('ephemeral', f'{args.text} has been forgotten.'), 200
