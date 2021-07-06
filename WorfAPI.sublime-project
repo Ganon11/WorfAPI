@@ -2,7 +2,12 @@
   "folders":
   [
     {
-      "path": "."
+      "path": "data",
+      "name": "Data"
+    },
+    {
+      "path": "src",
+      "name": "Source"
     }
   ],
   "settings":

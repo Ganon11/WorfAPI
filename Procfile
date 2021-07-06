@@ -1,1 +1,1 @@
-web: gunicorn worfapi:app
+web: gunicorn --pythonpath src worfapi:app
