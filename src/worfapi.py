@@ -1,22 +1,26 @@
+'''A simple Flask API to help determine whether someone or something is honorable.'''
+
 import hashlib
 import json
 from flask import Flask
 from flask_restful import Resource, Api, reqparse
+import inflect
 
 app = Flask(__name__)
 api = Api(app)
 
 def fetch_memory():
   '''Reads a json file and returns the equivalent object.'''
-  with open('data/memory.json', 'r') as fh:
-    return json.load(fh)
+  with open('data/memory.json', 'r') as file_handle:
+    return json.load(file_handle)
 
 def save_memory(obj):
   '''Dumps an object as a json string into a file.'''
-  with open('data/memory.json', 'w') as fh:
-    fh.write(json.dumps(obj))
+  with open('data/memory.json', 'w') as file_handle:
+    file_handle.write(json.dumps(obj))
 
 def create_response(response_type, text):
+  '''Creates a response object that Slack will understand.'''
   response = dict()
   response['response_type'] = response_type
   response['text'] = text
@@ -42,11 +46,19 @@ class Honor(Resource): # pylint: disable=too-few-public-methods
 
     return False
 
-  def _format_response(self, text, honorable):
+  @staticmethod
+  def _format_response(text, honorable):
+    engine = inflect.engine()
     if honorable:
-      return create_response('in_channel', f'{text} has honor.')
+      verb = 'has'
+      if engine.singular_noun(text):
+        verb = 'have'
+      return create_response('in_channel', f'{text} {verb} honor.')
 
-    return create_response('in_channel', f'{text} is without honor.')
+    verb = 'is'
+    if engine.singular_noun(text):
+      verb = 'are'
+    return create_response('in_channel', f'{text} {verb} without honor.')
 
   def post(self):
     '''Returns a phrase describing the honor of the input.'''
@@ -55,7 +67,7 @@ class Honor(Resource): # pylint: disable=too-few-public-methods
     args = parser.parse_args()
 
     is_honorable = self._get_honor(args.text.lower())
-    return self._format_response(args.text, is_honorable), 200
+    return Honor._format_response(args.text, is_honorable), 200
 
 class SetHonor(Resource): # pylint: disable=too-few-public-methods
   '''Overrides the honor value for a given input phrase.'''
@@ -63,7 +75,8 @@ class SetHonor(Resource): # pylint: disable=too-few-public-methods
   def __init__(self):
     self.memory = fetch_memory()
 
-  def _format_response(self, text, honorable):
+  @staticmethod
+  def _format_response(text, honorable):
     if honorable:
       return create_response('ephemeral', f'{text} will be remembered as honorable.')
 
@@ -98,7 +111,7 @@ class SetHonor(Resource): # pylint: disable=too-few-public-methods
       return create_response('ephemeral', 'Invalid request format: should be "phrase:true" or "phrase:false"'), 200
 
     save_memory(self.memory)
-    return self._format_response(values[0], is_honorable == 'true'), 200
+    return SetHonor._format_response(values[0], is_honorable == 'true'), 200
 
 class RemoveHonor(Resource): # pylint: disable=too-few-public-methods
   '''Removes an overriden value for a given input phrase.'''
@@ -113,15 +126,22 @@ class RemoveHonor(Resource): # pylint: disable=too-few-public-methods
     args = parser.parse_args()
 
     topic = args.text.lower()
+    engine = inflect.engine()
     if topic in self.memory['honor']:
       self.memory['honor'].remove(topic)
     elif topic in self.memory['dishonor']:
       self.memory['dishonor'].remove(topic)
     else:
-      return create_response('ephemeral', f'{args.text} was not found'), 200
+      verb = 'was'
+      if engine.singular_noun(args.text):
+        verb = 'were'
+      return create_response('ephemeral', f'{args.text} {verb} not found'), 200
 
     save_memory(self.memory)
-    return create_response('ephemeral', f'{args.text} has been forgotten.'), 200
+    verb = 'has'
+    if engine.singular_noun(args.text):
+      verb = 'have'
+    return create_response('ephemeral', f'{args.text} {verb} been forgotten.'), 200
 
 api.add_resource(Honor, '/honor')
 api.add_resource(SetHonor, '/sethonor')
