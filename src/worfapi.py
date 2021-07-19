@@ -1,7 +1,6 @@
 '''A simple Flask API to help determine whether someone or something is honorable.'''
 
 import hashlib
-import json
 import os
 from flask import Flask
 from flask_restful import Resource, Api, reqparse
@@ -24,14 +23,14 @@ def fetch_memory():
     honor_cursor = conn.cursor()
     honor_cursor.execute('SELECT "Topic" FROM "Honorable"')
     rows = honor_cursor.fetchall()
-    for r in rows:
-      honorable.add(r[0][0])
+    for row in rows:
+      honorable.add(row[0][0])
 
     dishonor_cursor = conn.cursor()
     dishonor_cursor.execute('SELECT "Topic" FROM "Dishonorable"')
     rows = dishonor_cursor.fetchall()
-    for r in rows:
-      dishonorable.add(r[0][0])
+    for row in rows:
+      dishonorable.add(row[0][0])
 
   memory = dict()
   memory['honor'] = honorable
@@ -45,8 +44,8 @@ def save_memory(obj):
     honor_cursor.execute('SELECT "Topic" FROM "Honorable"')
     rows = honor_cursor.fetchall()
     honorable = set()
-    for r in rows:
-      honorable.add(r[0][0])
+    for row in rows:
+      honorable.add(row[0][0])
 
     topics_to_add = (obj['honor'] - honorable)
     topics_to_remove = (honorable - obj['honor'])
@@ -59,8 +58,8 @@ def save_memory(obj):
     dishonor_cursor.execute('SELECT "Topic" FROM "Dishonorable"')
     rows = dishonor_cursor.fetchall()
     dishonorable = set()
-    for r in rows:
-      dishonorable.add(r[0][0])
+    for row in rows:
+      dishonorable.add(row[0][0])
 
     topics_to_add = (obj['dishonor'] - dishonorable)
     topics_to_remove = (dishonorable - obj['dishonor'])
