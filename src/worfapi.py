@@ -2,22 +2,72 @@
 
 import hashlib
 import json
+import os
 from flask import Flask
 from flask_restful import Resource, Api, reqparse
 import inflect
+import psycopg2
 
 app = Flask(__name__)
 api = Api(app)
 
+DATABASE_URL = os.environ['DATABASE_URL']
+
 def fetch_memory():
-  '''Reads a json file and returns the equivalent object.'''
-  with open('data/memory.json', 'r') as file_handle:
-    return json.load(file_handle)
+  '''
+  Reads the list of honorable and dishonorable topics from the database, and returns an object
+  containing both lists.
+  '''
+  honorable = set()
+  dishonorable = set()
+  with psycopg2.connect(DATABASE_URL, sslmode='require') as conn:
+    honor_cursor = conn.cursor()
+    honor_cursor.execute('SELECT "Topic" FROM "Honorable"')
+    rows = honor_cursor.fetchall()
+    for r in rows:
+      honorable.add(r[0][0])
+
+    dishonor_cursor = conn.cursor()
+    dishonor_cursor.execute('SELECT "Topic" FROM "Dishonorable"')
+    rows = dishonor_cursor.fetchall()
+    for r in rows:
+      dishonorable.add(r[0][0])
+
+  memory = dict()
+  memory['honor'] = honorable
+  memory['dishonor'] = dishonorable
+  return memory
 
 def save_memory(obj):
-  '''Dumps an object as a json string into a file.'''
-  with open('data/memory.json', 'w') as file_handle:
-    file_handle.write(json.dumps(obj))
+  '''Dumps an object describing honorable and dishonorable topics to the database.'''
+  with psycopg2.connect(DATABASE_URL, sslmode='require') as conn:
+    honor_cursor = conn.cursor()
+    honor_cursor.execute('SELECT "Topic" FROM "Honorable"')
+    rows = honor_cursor.fetchall()
+    honorable = set()
+    for r in rows:
+      honorable.add(r[0][0])
+
+    topics_to_add = (obj['honor'] - honorable)
+    topics_to_remove = (honorable - obj['honor'])
+    for topic in topics_to_remove:
+      honor_cursor.execute('DELETE FROM "Honorable" WHERE "Topic" = %s', ("{{{}}}".format(topic),))
+    for topic in topics_to_add:
+      honor_cursor.execute('INSERT INTO "Honorable" ("Topic") VALUES (%s)', ("{{{}}}".format(topic),))
+
+    dishonor_cursor = conn.cursor()
+    dishonor_cursor.execute('SELECT "Topic" FROM "Dishonorable"')
+    rows = dishonor_cursor.fetchall()
+    dishonorable = set()
+    for r in rows:
+      dishonorable.add(r[0][0])
+
+    topics_to_add = (obj['dishonor'] - dishonorable)
+    topics_to_remove = (dishonorable - obj['dishonor'])
+    for topic in topics_to_remove:
+      dishonor_cursor.execute('DELETE FROM "Dishonorable" WHERE "Topic" = %s', ("{{{}}}".format(topic),))
+    for topic in topics_to_add:
+      honor_cursor.execute('INSERT INTO "Dishonorable" ("Topic") VALUES (%s)', ("{{{}}}".format(topic),))
 
 def create_response(response_type, text):
   '''Creates a response object that Slack will understand.'''
@@ -97,13 +147,13 @@ class SetHonor(Resource): # pylint: disable=too-few-public-methods
 
     if is_honorable == 'true':
       if topic not in self.memory['honor']:
-        self.memory['honor'].append(topic)
+        self.memory['honor'].add(topic)
 
       if topic in self.memory['dishonor']:
         self.memory['dishonor'].remove(topic)
     elif is_honorable == 'false':
       if topic not in self.memory['dishonor']:
-        self.memory['dishonor'].append(topic)
+        self.memory['dishonor'].add(topic)
 
       if topic in self.memory['honor']:
         self.memory['honor'].remove(topic)
