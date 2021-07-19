@@ -24,13 +24,14 @@ def fetch_memory():
     honor_cursor.execute('SELECT "Topic" FROM "Honorable"')
     rows = honor_cursor.fetchall()
     for row in rows:
-      honorable.add(row[0][0])
+      topic = row[0]
+      honorable.add(topic)
 
     dishonor_cursor = conn.cursor()
     dishonor_cursor.execute('SELECT "Topic" FROM "Dishonorable"')
     rows = dishonor_cursor.fetchall()
     for row in rows:
-      dishonorable.add(row[0][0])
+      dishonorable.add(row[0])
 
   memory = dict()
   memory['honor'] = honorable
@@ -45,28 +46,28 @@ def save_memory(obj):
     rows = honor_cursor.fetchall()
     honorable = set()
     for row in rows:
-      honorable.add(row[0][0])
+      honorable.add(row[0])
 
     topics_to_add = (obj['honor'] - honorable)
     topics_to_remove = (honorable - obj['honor'])
     for topic in topics_to_remove:
-      honor_cursor.execute('DELETE FROM "Honorable" WHERE "Topic" = %s', ("{{{}}}".format(topic),))
+      honor_cursor.execute('DELETE FROM "Honorable" WHERE "Topic" = %s', (topic,))
     for topic in topics_to_add:
-      honor_cursor.execute('INSERT INTO "Honorable" ("Topic") VALUES (%s)', ("{{{}}}".format(topic),))
+      honor_cursor.execute('INSERT INTO "Honorable" ("Topic") VALUES (%s)', (topic,))
 
     dishonor_cursor = conn.cursor()
     dishonor_cursor.execute('SELECT "Topic" FROM "Dishonorable"')
     rows = dishonor_cursor.fetchall()
     dishonorable = set()
     for row in rows:
-      dishonorable.add(row[0][0])
+      dishonorable.add(row[0])
 
     topics_to_add = (obj['dishonor'] - dishonorable)
     topics_to_remove = (dishonorable - obj['dishonor'])
     for topic in topics_to_remove:
-      dishonor_cursor.execute('DELETE FROM "Dishonorable" WHERE "Topic" = %s', ("{{{}}}".format(topic),))
+      dishonor_cursor.execute('DELETE FROM "Dishonorable" WHERE "Topic" = %s', (topic,))
     for topic in topics_to_add:
-      honor_cursor.execute('INSERT INTO "Dishonorable" ("Topic") VALUES (%s)', ("{{{}}}".format(topic),))
+      honor_cursor.execute('INSERT INTO "Dishonorable" ("Topic") VALUES (%s)', (topic,))
 
 def create_response(response_type, text):
   '''Creates a response object that Slack will understand.'''
